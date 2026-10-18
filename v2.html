@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test son v2</title>
+<style>
+  body { background:#111; color:#eee; font-family:system-ui,sans-serif; margin:0; padding:24px 16px; }
+  h1 { font-size:20px; }
+  label { display:block; margin:20px 0 6px; }
+  input[type=range] { width:100%; }
+  button { width:100%; padding:18px; margin-top:24px; font-size:18px; border:0; border-radius:12px; background:#3a6df0; color:#fff; }
+  #etat { margin-top:16px; color:#aaa; }
+</style>
+</head>
+<body>
+<h1>Test son v2 : moteur audio en direct</h1>
+<p>Même test : Jouer, verrouiller 30 min. Vérifie : coupure ? clic toutes les 30 s ? volume en temps réel ?</p>
+
+<label>Bruit brun : <span id="vb">60</span>%</label>
+<input id="bruit" type="range" min="0" max="100" value="60">
+
+<label>Onde alpha 10 Hz : <span id="vo">40</span>%</label>
+<input id="onde" type="range" min="0" max="100" value="40">
+
+<button id="jouer">Jouer</button>
+<button id="stop" style="background:#444">Stop</button>
+<p id="etat"></p>
+
+<script>
+// Safari 17+ : traiter la page comme une lecture média (continue écran verrouillé, ignore le bouton silencieux)
+if (navigator.audioSession) navigator.audioSession.type = 'playback';
+
+let ctx, gainBruit, gainOnde, sources = [], debut;
+const bruit = document.getElementById('bruit'), onde = document.getElementById('onde');
+const etat = document.getElementById('etat');
+
+function bufferBruitBrun(ctx) {
+  const N = ctx.sampleRate * 30, FONDU = ctx.sampleRate;
+  const brut = new Float32Array(N + FONDU);
+  let dernier = 0;
+  for (let i = 0; i < brut.length; i++) {
+    dernier = (dernier + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+    brut[i] = dernier * 3.5;
+  }
+  // Fondu enchaîné fin → début pour une boucle sans saut
+  const buf = ctx.createBuffer(1, N, ctx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < N; i++) d[i] = brut[i];
+  for (let i = 0; i < FONDU; i++) { const t = i / FONDU; d[i] = brut[N + i] * (1 - t) + brut[i] * t; }
+  return buf;
+}
+
+function demarrer() {
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+  gainBruit = ctx.createGain(); gainBruit.connect(ctx.destination);
+  const src = ctx.createBufferSource();
+  src.buffer = bufferBruitBrun(ctx); src.loop = true;
+  src.connect(gainBruit); src.start();
+
+  // Onde binaurale : 200 Hz à gauche, 210 Hz à droite, générées en continu
+  gainOnde = ctx.createGain(); gainOnde.connect(ctx.destination);
+  const fusion = ctx.createChannelMerger(2); fusion.connect(gainOnde);
+  [200, 210].forEach((f, canal) => {
+    const osc = ctx.createOscillator(); osc.frequency.value = f;
+    osc.connect(fusion, 0, canal); osc.start();
+    sources.push(osc);
+  });
+  sources.push(src);
+
+  appliquerVolumes();
+  if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Concentration', artist: 'Mix de test' });
+  debut = Date.now();
+}
+
+function appliquerVolumes() {
+  if (!ctx) return;
+  // Transition de 50 ms pour éviter les clics quand on bouge le curseur
+  gainBruit.gain.setTargetAtTime(bruit.value / 100, ctx.currentTime, 0.05);
+  gainOnde.gain.setTargetAtTime(onde.value / 100 * 0.3, ctx.currentTime, 0.05);
+}
+
+bruit.oninput = () => { vb.textContent = bruit.value; appliquerVolumes(); };
+onde.oninput = () => { vo.textContent = onde.value; appliquerVolumes(); };
+
+document.getElementById('jouer').onclick = () => {
+  if (!ctx) demarrer(); else ctx.resume();
+};
+document.getElementById('stop').onclick = () => ctx && ctx.suspend();
+
+setInterval(() => {
+  etat.textContent = !ctx || ctx.state !== 'running' ? `Arrêté (${ctx ? ctx.state : '-'})`
+    : `Lecture depuis ${Math.floor((Date.now() - debut) / 60000)} min · audioSession ${navigator.audioSession ? 'oui' : 'non'}`;
+}, 1000);
+</script>
+</body>
+</html>
