@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B2A35">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Concentration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --lac: #1B2A35;
+    --ardoise: #2E4556;
+    --pierre: #6B7E8C;
+    --brume: #DDE2E7;
+    --ocre: #C9A13B;
+    --bas: calc(76px + env(safe-area-inset-bottom));
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--lac); color: var(--brume);
+    font-family: Manrope, system-ui, sans-serif; font-size: 17px; line-height: 1.4;
+    overflow: hidden; height: 100dvh;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { background: none; border: 0; padding: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--ocre); outline-offset: 3px; }
+
+  /* Paysage de brume */
+  #paysage { position: fixed; inset: 0; z-index: 0; }
+  #paysage svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #brume {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
+    background: linear-gradient(to top, rgba(221,226,231,.38), rgba(221,226,231,.12) 70%, transparent);
+    transition: height 1s linear;
+  }
+
+  .vue { position: fixed; inset: 0; bottom: var(--bas); z-index: 1;
+    padding: calc(env(safe-area-inset-top) + 24px) 20px 20px; display: flex; flex-direction: column; }
+  .cache { display: none !important; }
+
+  /* Écran Focus */
+  h1 { font-size: 28px; font-weight: 600; letter-spacing: -.01em; margin: 8px 0 0; }
+  .zone { margin-top: auto; display: grid; grid-template-columns: 1fr 64px; gap: 16px; align-items: end; }
+  .couches { list-style: none; margin: 0; padding: 0;
+    background: rgba(27,42,53,.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-radius: 20px; }
+  .couches li + li { border-top: 1px solid rgba(221,226,231,.1); }
+  .couche { width: 100%; display: grid; grid-template-columns: 76px 1fr 12px; align-items: center;
+    gap: 8px; padding: 0 18px; min-height: 64px; text-align: left; }
+  .couche .type { color: var(--pierre); font-size: 15px; }
+  .couche .choix { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .couche .choix.vide { color: var(--pierre); font-weight: 400; }
+  .couche svg { stroke: var(--pierre); }
+
+  .objectif { margin-top: 12px; width: 100%; min-height: 52px; padding: 0 18px; border-radius: 16px;
+    border: 1px solid rgba(221,226,231,.16); background: rgba(27,42,53,.5); }
+  .objectif::placeholder { color: var(--pierre); }
+
+  /* Roue de durée */
+  .roue-boite { position: relative; height: 216px; border-radius: 32px; background: rgba(27,42,53,.72);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .roue-boite::after { content: ""; position: absolute; left: 6px; right: 6px; top: 50%; height: 48px;
+    transform: translateY(-50%); border-radius: 24px; border: 1px solid rgba(221,226,231,.22); pointer-events: none; }
+  .roue { height: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent);
+            mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+  .roue::-webkit-scrollbar { display: none; }
+  .roue div { height: 48px; display: grid; place-items: center; scroll-snap-align: center;
+    font-variant-numeric: tabular-nums; color: var(--pierre); font-weight: 600; transition: color .15s; }
+  .roue div.actif { color: var(--brume); font-size: 20px; }
+  .roue .bord { height: 84px; scroll-snap-align: none; }
+
+  .lancer { margin-top: 16px; width: 100%; min-height: 64px; border-radius: 32px; background: var(--ocre);
+    color: var(--lac); font-weight: 700; font-size: 18px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .lancer:active { transform: scale(.98); }
+
+  /* Écran Session */
+  #session { align-items: center; text-align: center; }
+  #session .objectif-en-cours { margin-top: 18vh; color: var(--brume); font-size: 20px; font-weight: 500; max-width: 30ch; }
+  .minuteur { font-size: 88px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; margin-top: 12px; }
+  .mix-en-cours { color: var(--pierre); font-size: 15px; }
+  .commandes { margin-top: auto; display: flex; gap: 20px; align-items: center; }
+  .rond { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(27,42,53,.72); border: 1px solid rgba(221,226,231,.18); }
+  .rond.principal { width: 88px; height: 88px; background: var(--ocre); border: 0; }
+  .rond.principal svg { stroke: var(--lac); fill: var(--lac); }
+  .rond svg { stroke: var(--brume); }
+
+  /* Autres onglets */
+  .vide-msg { margin-top: auto; margin-bottom: auto; color: var(--pierre); max-width: 28ch; }
+
+  /* Menu du bas */
+  nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; height: var(--bas);
+    padding: 8px 12px env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(4, 1fr);
+    background: rgba(27,42,53,.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid rgba(221,226,231,.08); }
+  nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    font-size: 13px; color: var(--pierre); min-height: 56px; }
+  nav button svg { stroke: currentColor; }
+  nav button[aria-current="page"] { color: var(--brume); }
+
+  /* Panneau */
+  #voile { position: fixed; inset: 0; z-index: 3; background: rgba(10,16,20,.5); opacity: 0; pointer-events: none; transition: opacity .25s; }
+  #voile.ouvert { opacity: 1; pointer-events: auto; }
+  #panneau { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; max-height: 78dvh; overflow-y: auto;
+    background: var(--ardoise); border-radius: 24px 24px 0 0; padding: 12px 20px calc(24px + env(safe-area-inset-bottom));
+    transform: translateY(100%); transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+  #panneau.ouvert { transform: none; }
+  .poignee { width: 40px; height: 5px; border-radius: 3px; background: rgba(221,226,231,.3); margin: 0 auto 16px; }
+  #panneau h2 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+  #panneau .aide { color: #A9B6C0; font-size: 15px; margin: 0 0 16px; }
+  .option { border-radius: 16px; padding: 0 16px; margin-bottom: 8px; background: rgba(27,42,53,.55); }
+  .option > button { width: 100%; min-height: 56px; display: flex; align-items: center; justify-content: space-between; text-align: left; }
+  .option .coche { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--pierre); display: grid; place-items: center; }
+  .option.choisi .coche { border-color: var(--ocre); background: var(--ocre); }
+  .option.choisi .coche::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--lac); }
+  .option input[type=range] { width: 100%; margin: 0 0 16px; accent-color: var(--ocre); }
+  .fermer { width: 100%; min-height: 56px; margin-top: 8px; border-radius: 28px; background: var(--brume); color: var(--lac); font-weight: 700; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, #brume { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="paysage" aria-hidden="true">
+  <svg viewBox="0 0 400 860" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <linearGradient id="ciel" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#8FA3B2"/><stop offset=".45" stop-color="#4E6678"/><stop offset="1" stop-color="#1B2A35"/>
+      </linearGradient>
+      <linearGradient id="voileM" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#DDE2E7" stop-opacity=".35"/><stop offset="1" stop-color="#DDE2E7" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <rect width="400" height="860" fill="url(#ciel)"/>
+    <path d="M0 300 L70 230 L120 260 L190 170 L250 240 L310 200 L400 270 V860 H0Z" fill="#6F8798" opacity=".7"/>
+    <rect y="180" width="400" height="160" fill="url(#voileM)"/>
+    <path d="M0 360 L50 300 L110 340 L170 280 L240 350 L300 310 L400 370 V860 H0Z" fill="#4A6274"/>
+    <rect y="290" width="400" height="120" fill="url(#voileM)" opacity=".7"/>
+    <path d="M0 430 L80 380 L150 420 L220 370 L290 430 L360 400 L400 420 V860 H0Z" fill="#2E4556"/>
+    <rect y="440" width="400" height="420" fill="#1B2A35" opacity=".85"/>
+  </svg>
+  <div id="brume"></div>
+</div>
+
+<!-- Focus -->
+<section id="focus" class="vue">
+  <h1>Prêt à te concentrer</h1>
+  <div class="zone">
+    <div>
+      <ul class="couches">
+        <li><button class="couche" data-type="musique"><span class="type">Musique</span><span class="choix"></span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke-width="1.8"><path d="M4 2l4 4-4 4"/></svg></button></li>
+        <li><button class="couche" data-type="bruit"><span class="type">Bruit</span><span class="choix"></span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke-width="1.8"><path d="M4 2l4 4-4 4"/></svg></button></li>
+        <li><button class="couche" data-type="onde"><span class="type">Onde</span><span class="choix"></span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke-width="1.8"><path d="M4 2l4 4-4 4"/></svg></button></li>
+      </ul>
+      <input class="objectif" id="objectif" placeholder="Objectif de la session (facultatif)" enterkeyhint="done">
+    </div>
+    <div class="roue-boite"><div class="roue" id="roue" aria-label="Durée en minutes"></div></div>
+  </div>
+  <button class="lancer" id="lancer">
+    <svg width="18" height="18" viewBox="0 0 18 18"><path d="M5 3l10 6-10 6z" fill="currentColor"/></svg>
+    <span>Lancer <span id="duree-txt">25</span> min</span>
+  </button>
+</section>
+
+<!-- Session en cours -->
+<section id="session" class="vue cache">
+  <p class="objectif-en-cours" id="obj-en-cours"></p>
+  <div class="minuteur" id="minuteur">25:00</div>
+  <div class="mix-en-cours" id="mix-en-cours"></div>
+  <div class="commandes">
+    <button class="rond" id="arreter" aria-label="Arrêter la session">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke-width="2"><rect x="5" y="5" width="12" height="12" rx="2"/></svg>
+    </button>
+    <button class="rond principal" id="pause" aria-label="Mettre en pause">
+      <svg id="ico-pause" width="26" height="26" viewBox="0 0 26 26"><rect x="6" y="5" width="5" height="16" rx="1.5"/><rect x="15" y="5" width="5" height="16" rx="1.5"/></svg>
+      <svg id="ico-reprendre" class="cache" width="26" height="26" viewBox="0 0 26 26"><path d="M8 5l13 8-13 8z"/></svg>
+    </button>
+    <span style="width:72px"></span>
+  </div>
+</section>
+
+<section id="mix" class="vue cache"><h1>Mix</h1><p class="vide-msg">Tes Mix favoris apparaîtront ici. Cet écran arrive dans la prochaine version du prototype.</p></section>
+<section id="sons" class="vue cache"><h1>Sons</h1><p class="vide-msg">Toutes les Musiques, tous les Bruits et toutes les Ondes, à écouter un par un. Prochaine version.</p></section>
+<section id="historique" class="vue cache"><h1>Historique</h1><p class="vide-msg">Tes Sessions terminées s'afficheront ici. Prochaine version.</p></section>
+
+<nav>
+  <button data-vue="focus" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>Focus</button>
+  <button data-vue="mix"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z"/></svg>Mix</button>
+  <button data-vue="sons"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>Sons</button>
+  <button data-vue="historique"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Historique</button>
+</nav>
+
+<div id="voile"></div>
+<div id="panneau" role="dialog" aria-modal="true">
+  <div class="poignee"></div>
+  <h2 id="p-titre"></h2>
+  <p class="aide" id="p-aide"></p>
+  <div id="p-options"></div>
+  <button class="fermer" id="p-fermer">Valider</button>
+</div>
+
+<script>
+if (navigator.audioSession) navigator.audioSession.type = 'playback';
+
+// --- Catalogue (prototype : tout est généré par le code) ---
+const SONS = {
+  musique: [
+    { id: 'nappe', nom: 'Nappe grave', notes: [110, 164.8, 220] },
+    { id: 'aube', nom: 'Aube', notes: [146.8, 220, 293.7] },
+  ],
+  bruit: [
+    { id: 'brun', nom: 'Bruit brun' },
+    { id: 'rose', nom: 'Bruit rose' },
+    { id: 'blanc', nom: 'Bruit blanc' },
+  ],
+  onde: [
+    { id: 'theta', nom: 'Thêta 6 Hz', ecart: 6 },
+    { id: 'alpha', nom: 'Alpha 10 Hz', ecart: 10 },
+    { id: 'beta', nom: 'Bêta 18 Hz', ecart: 18 },
+  ],
+};
+const MAX = { musique: 1, bruit: 3, onde: 1 };
+const AIDE = {
+  musique: 'Une musique à la fois.',
+  bruit: "Jusqu'à 3 bruits, chacun avec son volume.",
+  onde: 'Une onde à la fois. À écouter avec des écouteurs.',
+};
+const TITRE = { musique: 'Musique', bruit: 'Bruit', onde: 'Onde' };
+
+// Mix courant : type → { id → volume 0..1 }
+const mix = { musique: { nappe: .5 }, bruit: { brun: .6 }, onde: { alpha: .4 } };
+
+// --- Audio ---
+let ctx, maitre;
+const voies = {}; // "type:id" → { gain, arreter() }
+
+function audio() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    maitre = ctx.createGain(); maitre.connect(ctx.destination);
+  }
+  return ctx;
+}
+
+function bufferBruit(type) {
+  const N = ctx.sampleRate * 30, F = ctx.sampleRate, brut = new Float32Array(N + F);
+  let b0 = 0, b1 = 0, b2 = 0, dernier = 0;
+  for (let i = 0; i < brut.length; i++) {
+    const w = Math.random() * 2 - 1;
+    if (type === 'blanc') brut[i] = w * .3;
+    else if (type === 'rose') { b0 = .997 * b0 + w * .029; b1 = .985 * b1 + w * .032; b2 = .95 * b2 + w * .048; brut[i] = (b0 + b1 + b2 + w * .02) * .9; }
+    else { dernier = (dernier + .02 * w) / 1.02; brut[i] = dernier * 3.5; }
+  }
+  const buf = ctx.createBuffer(1, N, ctx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < N; i++) d[i] = brut[i];
+  for (let i = 0; i < F; i++) { const t = i / F; d[i] = brut[N + i] * (1 - t) + brut[i] * t; }
+  return buf;
+}
+
+function creerVoie(type, id) {
+  const gain = ctx.createGain(); gain.gain.value = 0; gain.connect(maitre);
+  const noeuds = [];
+  if (type === 'bruit') {
+    const s = ctx.createBufferSource(); s.buffer = bufferBruit(id); s.loop = true; s.connect(gain); s.start(); noeuds.push(s);
+  } else if (type === 'onde') {
+    const ecart = SONS.onde.find(o => o.id === id).ecart, fusion = ctx.createChannelMerger(2);
+    const g2 = ctx.createGain(); g2.gain.value = .3; fusion.connect(g2); g2.connect(gain);
+    [200, 200 + ecart].forEach((f, c) => { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(fusion, 0, c); o.start(); noeuds.push(o); });
+  } else {
+    // Nappe : accord doux qui respire lentement
+    const notes = SONS.musique.find(m => m.id === id).notes;
+    notes.forEach((f, i) => {
+      [-3, 3].forEach(desaccord => {
+        const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f; o.detune.value = desaccord;
+        const g = ctx.createGain(); g.gain.value = .05;
+        const lfo = ctx.createOscillator(); lfo.frequency.value = .05 + i * .03;
+        const lg = ctx.createGain(); lg.gain.value = .035; lfo.connect(lg); lg.connect(g.gain);
+        o.connect(g); g.connect(gain); o.start(); lfo.start(); noeuds.push(o, lfo);
+      });
+    });
+  }
+  return { gain, arreter() { gain.gain.setTargetAtTime(0, ctx.currentTime, .1); setTimeout(() => noeuds.forEach(n => n.stop()), 600); } };
+}
+
+// Aligne les voies audio sur le Mix courant (ajoute, retire, ajuste les volumes en temps réel)
+function synchroniser() {
+  if (!ctx) return;
+  const voulu = new Set();
+  for (const type in mix) for (const id in mix[type]) {
+    const cle = type + ':' + id; voulu.add(cle);
+    if (!voies[cle]) voies[cle] = creerVoie(type, id);
+    voies[cle].gain.gain.setTargetAtTime(mix[type][id], ctx.currentTime, .05);
+  }
+  for (const cle in voies) if (!voulu.has(cle)) { voies[cle].arreter(); delete voies[cle]; }
+}
+
+// La fin est planifiée dans le moteur audio : elle sonne même écran verrouillé, quand le JavaScript est ralenti
+let clocheNoeuds = [];
+function planifierFin(dans) {
+  annulerFin();
+  const t = ctx.currentTime + dans;
+  [880, 1320].forEach((f, i) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f;
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.setValueAtTime(.25 / (i + 1), t); g.gain.exponentialRampToValueAtTime(.0001, t + 4);
+    o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 4);
+    clocheNoeuds.push(o);
+  });
+  maitre.gain.cancelScheduledValues(ctx.currentTime);
+  maitre.gain.setValueAtTime(1, ctx.currentTime);
+  maitre.gain.setTargetAtTime(0, t + 1, 3); // fondu sur ~10 s après la cloche
+}
+function annulerFin() {
+  clocheNoeuds.forEach(o => { try { o.stop(); } catch (e) {} });
+  clocheNoeuds = [];
+  if (maitre) { maitre.gain.cancelScheduledValues(ctx.currentTime); maitre.gain.setValueAtTime(1, ctx.currentTime); }
+}
+
+// --- Écran Focus ---
+const nom = (type, id) => SONS[type].find(s => s.id === id).nom;
+function libelle(type) {
+  const ids = Object.keys(mix[type]);
+  return ids.length ? ids.map(id => nom(type, id)).join(' + ') : 'Aucun' + (type === 'musique' || type === 'onde' ? 'e' : '');
+}
+function afficherCouches() {
+  document.querySelectorAll('.couche').forEach(b => {
+    const c = b.querySelector('.choix'), type = b.dataset.type;
+    c.textContent = libelle(type); c.classList.toggle('vide', !Object.keys(mix[type]).length);
+  });
+}
+
+// Roue de durée 10 → 60 min
+const roue = document.getElementById('roue');
+let duree = 25;
+roue.innerHTML = '<div class="bord"></div>' + Array.from({ length: 51 }, (_, i) => `<div data-v="${i + 10}">${i + 10}</div>`).join('') + '<div class="bord"></div>';
+const crans = [...roue.querySelectorAll('[data-v]')];
+function lireRoue() {
+  const centre = roue.scrollTop + roue.clientHeight / 2;
+  let plusProche = crans[0];
+  crans.forEach(c => { if (Math.abs(c.offsetTop + 24 - centre) < Math.abs(plusProche.offsetTop + 24 - centre)) plusProche = c; });
+  crans.forEach(c => c.classList.toggle('actif', c === plusProche));
+  duree = +plusProche.dataset.v;
+  document.getElementById('duree-txt').textContent = duree;
+}
+roue.addEventListener('scroll', lireRoue, { passive: true });
+requestAnimationFrame(() => { const c = crans[15]; roue.scrollTop = c.offsetTop + 24 - roue.clientHeight / 2; lireRoue(); });
+
+// --- Panneau de choix ---
+const panneau = document.getElementById('panneau'), voile = document.getElementById('voile');
+let typeOuvert;
+function ouvrirPanneau(type) {
+  typeOuvert = type;
+  document.getElementById('p-titre').textContent = TITRE[type];
+  document.getElementById('p-aide').textContent = AIDE[type];
+  dessinerOptions();
+  panneau.classList.add('ouvert'); voile.classList.add('ouvert');
+  audio(); ctx.resume(); synchroniser(); // écoute pendant le choix
+}
+function dessinerOptions() {
+  const type = typeOuvert, box = document.getElementById('p-options');
+  box.innerHTML = '';
+  SONS[type].forEach(s => {
+    const choisi = s.id in mix[type], div = document.createElement('div');
+    div.className = 'option' + (choisi ? ' choisi' : '');
+    div.innerHTML = `<button><span>${s.nom}</span><span class="coche"></span></button>` +
+      (choisi ? `<input type="range" min="0" max="100" value="${Math.round(mix[type][s.id] * 100)}" aria-label="Volume ${s.nom}">` : '');
+    div.querySelector('button').onclick = () => {
+      if (choisi) delete mix[type][s.id];
+      else {
+        if (MAX[type] === 1) mix[type] = {};
+        else if (Object.keys(mix[type]).length >= MAX[type]) return;
+        mix[type][s.id] = .5;
+      }
+      dessinerOptions(); afficherCouches(); synchroniser();
+    };
+    const curseur = div.querySelector('input');
+    if (curseur) curseur.oninput = () => { mix[type][s.id] = curseur.value / 100; synchroniser(); };
+    box.appendChild(div);
+  });
+}
+function fermerPanneau() {
+  panneau.classList.remove('ouvert'); voile.classList.remove('ouvert');
+  if (!enSession && ctx) ctx.suspend();
+}
+document.querySelectorAll('.couche').forEach(b => b.onclick = () => ouvrirPanneau(b.dataset.type));
+document.getElementById('p-fermer').onclick = fermerPanneau;
+voile.onclick = fermerPanneau;
+
+// --- Session ---
+// Le temps restant se calcule depuis l'heure de fin : pas de dérive si l'écran est verrouillé
+let enSession = false, enPause = false, reste, fin, minuterie;
+const brume = document.getElementById('brume');
+function format(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+function tic() {
+  if (enPause) return;
+  reste = Math.max(0, Math.round((fin - Date.now()) / 1000));
+  document.getElementById('minuteur').textContent = format(reste);
+  brume.style.height = (100 * (1 - reste / (duree * 60))) + '%';
+  if (reste <= 0) terminer();
+}
+document.getElementById('lancer').onclick = () => {
+  audio(); ctx.resume(); synchroniser();
+  enSession = true; enPause = false; reste = duree * 60; fin = Date.now() + reste * 1000;
+  planifierFin(reste);
+  const obj = document.getElementById('objectif').value.trim();
+  document.getElementById('obj-en-cours').textContent = obj || 'Session de ' + duree + ' min';
+  document.getElementById('mix-en-cours').textContent = ['musique', 'bruit', 'onde'].map(libelle).filter(t => !t.startsWith('Aucun')).join(' · ');
+  document.getElementById('minuteur').textContent = format(reste);
+  montrer('session');
+  if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: obj || 'Session de concentration', artist: 'Concentration' });
+  clearInterval(minuterie); minuterie = setInterval(tic, 1000);
+};
+document.getElementById('pause').onclick = () => {
+  enPause = !enPause;
+  if (enPause) ctx.suspend();
+  else { fin = Date.now() + reste * 1000; ctx.resume().then(() => planifierFin(reste)); }
+  document.getElementById('ico-pause').classList.toggle('cache', enPause);
+  document.getElementById('ico-reprendre').classList.toggle('cache', !enPause);
+  document.getElementById('pause').setAttribute('aria-label', enPause ? 'Reprendre' : 'Mettre en pause');
+};
+function finSession() {
+  clearInterval(minuterie); enSession = false; brume.style.height = '0%';
+  document.getElementById('ico-pause').classList.remove('cache');
+  document.getElementById('ico-reprendre').classList.add('cache');
+  montrer('focus');
+}
+document.getElementById('arreter').onclick = () => { annulerFin(); ctx.suspend(); finSession(); };
+function terminer() {
+  // Cloche et fondu déjà planifiés dans le moteur audio
+  setTimeout(() => { if (!enSession) { ctx.suspend(); annulerFin(); } }, 12000);
+  finSession();
+}
+
+// --- Navigation ---
+function montrer(vue) {
+  const onglet = vue === 'session' ? 'focus' : vue;
+  document.querySelectorAll('.vue').forEach(v => v.classList.toggle('cache', v.id !== vue));
+  document.querySelectorAll('nav button').forEach(b => {
+    if (b.dataset.vue === onglet) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => montrer(b.dataset.vue === 'focus' && enSession ? 'session' : b.dataset.vue));
+
+afficherCouches();
+</script>
+</body>
+</html>
