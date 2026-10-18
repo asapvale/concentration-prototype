@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test son écran verrouillé</title>
+<style>
+  body { background:#111; color:#eee; font-family:system-ui,sans-serif; margin:0; padding:24px 16px; }
+  h1 { font-size:20px; }
+  label { display:block; margin:20px 0 6px; }
+  input[type=range] { width:100%; }
+  button { width:100%; padding:18px; margin-top:24px; font-size:18px; border:0; border-radius:12px; background:#3a6df0; color:#fff; }
+  #etat { margin-top:16px; color:#aaa; }
+</style>
+</head>
+<body>
+<h1>Test : son écran verrouillé</h1>
+<p>1. Règle les volumes. 2. Appuie sur Jouer. 3. Verrouille l'écran 30 min. Écoute si le son se coupe ou s'il y a un « clic » toutes les 30 s.</p>
+
+<label>Bruit brun : <span id="vb">60</span>%</label>
+<input id="bruit" type="range" min="0" max="100" value="60">
+
+<label>Onde alpha 10 Hz : <span id="vo">40</span>%</label>
+<input id="onde" type="range" min="0" max="100" value="40">
+
+<button id="jouer">Jouer</button>
+<button id="stop" style="background:#444">Stop</button>
+<p id="etat"></p>
+<audio id="audio" loop></audio>
+
+<script>
+const TAUX = 44100, DUREE = 30, N = TAUX * DUREE, FONDU = TAUX; // 1 s de fondu enchaîné à la boucle
+
+function bruitBrun() {
+  // On génère N + FONDU échantillons puis on fond la fin dans le début pour une boucle sans clic
+  const brut = new Float32Array(N + FONDU);
+  let dernier = 0;
+  for (let i = 0; i < brut.length; i++) {
+    dernier = (dernier + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+    brut[i] = dernier * 3.5;
+  }
+  const sortie = brut.slice(0, N);
+  for (let i = 0; i < FONDU; i++) {
+    const t = i / FONDU;
+    sortie[i] = brut[N + i] * (1 - t) + brut[i] * t;
+  }
+  return sortie;
+}
+
+function genererOnde(freqG, freqD) {
+  // 30 s × fréquences entières = nombre entier de cycles, donc boucle parfaite
+  const g = new Float32Array(N), d = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    g[i] = Math.sin(2 * Math.PI * freqG * i / TAUX);
+    d[i] = Math.sin(2 * Math.PI * freqD * i / TAUX);
+  }
+  return [g, d];
+}
+
+function wav(gauche, droite) {
+  const buf = new ArrayBuffer(44 + N * 4), v = new DataView(buf);
+  const ecrire = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  ecrire(0, 'RIFF'); v.setUint32(4, 36 + N * 4, true); ecrire(8, 'WAVE');
+  ecrire(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+  v.setUint32(24, TAUX, true); v.setUint32(28, TAUX * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+  ecrire(36, 'data'); v.setUint32(40, N * 4, true);
+  for (let i = 0, o = 44; i < N; i++, o += 4) {
+    v.setInt16(o, Math.max(-1, Math.min(1, gauche[i])) * 32767, true);
+    v.setInt16(o + 2, Math.max(-1, Math.min(1, droite[i])) * 32767, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+const brun = bruitBrun(), [ondeG, ondeD] = genererOnde(200, 210);
+const audio = document.getElementById('audio'), etat = document.getElementById('etat');
+let url;
+
+function mixer() {
+  // iOS ignore audio.volume : les volumes sont intégrés dans le fichier
+  const vb = bruit.value / 100, vo = onde.value / 100 * 0.3;
+  const g = new Float32Array(N), d = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    g[i] = brun[i] * vb + ondeG[i] * vo;
+    d[i] = brun[i] * vb + ondeD[i] * vo;
+  }
+  if (url) URL.revokeObjectURL(url);
+  url = URL.createObjectURL(wav(g, d));
+}
+
+const bruit = document.getElementById('bruit'), onde = document.getElementById('onde');
+bruit.oninput = () => vb.textContent = bruit.value;
+onde.oninput = () => vo.textContent = onde.value;
+// Changer un volume en cours de lecture recalcule le Mix
+[bruit, onde].forEach(el => el.onchange = () => { if (!audio.paused) jouer(); });
+
+let debut;
+function jouer() {
+  mixer();
+  audio.src = url;
+  audio.play();
+  debut = Date.now();
+}
+document.getElementById('jouer').onclick = jouer;
+document.getElementById('stop').onclick = () => audio.pause();
+setInterval(() => {
+  etat.textContent = audio.paused ? 'Arrêté' : `Lecture depuis ${Math.floor((Date.now() - debut) / 60000)} min`;
+}, 1000);
+</script>
+</body>
+</html>
