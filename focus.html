@@ -271,14 +271,26 @@ const SONS = {
     { id: 'piano', nom: 'Piano lointain', detail: 'Notes graves et lentes', buffer: 'piano' },
   ],
   bruit: [
-    { id: 'pluie', nom: 'Pluie', groupe: 'Nature' },
-    { id: 'vagues', nom: 'Vagues', groupe: 'Nature' },
-    { id: 'vent', nom: 'Vent', groupe: 'Nature' },
-    { id: 'feu', nom: 'Feu de bois', groupe: 'Nature' },
-    { id: 'ruisseau', nom: 'Ruisseau', groupe: 'Nature' },
-    { id: 'brun', nom: 'Bruit brun', groupe: 'Couleurs', detail: 'Grave et profond' },
-    { id: 'rose', nom: 'Bruit rose', groupe: 'Couleurs', detail: 'Équilibré' },
-    { id: 'blanc', nom: 'Bruit blanc', groupe: 'Couleurs', detail: 'Aigu, masque tout' },
+    { id: 'pluie-foret', nom: 'Pluie en forêt', fichier: true },
+    { id: 'orage', nom: 'Orage lointain', fichier: true },
+    { id: 'vagues', nom: 'Vagues sur la plage', fichier: true },
+    { id: 'ruisseau', nom: 'Ruisseau de montagne', fichier: true },
+    { id: 'cheminee', nom: 'Feu de cheminée', fichier: true },
+    { id: 'vent-arbres', nom: 'Vent dans les arbres', fichier: true },
+    { id: 'cafe', nom: 'Café calme', fichier: true },
+    { id: 'bibliotheque', nom: 'Bibliothèque', fichier: true },
+    { id: 'train-nuit', nom: 'Train de nuit', fichier: true },
+    { id: 'grillons', nom: "Nuit d'été, grillons", fichier: true },
+    { id: 'oiseaux-matin', nom: 'Oiseaux au petit matin', fichier: true },
+    { id: 'ville-nuit', nom: 'Ville la nuit', fichier: true },
+    { id: 'avion', nom: "Cabine d'avion", fichier: true },
+    { id: 'voilier', nom: 'Voilier', fichier: true },
+    { id: 'ronronnement', nom: 'Chat qui ronronne', fichier: true },
+    { id: 'ventilateur', nom: 'Ventilateur', fichier: true },
+    { id: 'sous-l-eau', nom: "Sous l'eau", fichier: true },
+    { id: 'brun', nom: 'Bruit brun', detail: 'Grave et profond' },
+    { id: 'rose', nom: 'Bruit rose', detail: 'Équilibré' },
+    { id: 'blanc', nom: 'Bruit blanc', detail: 'Aigu, masque tout' },
   ],
   onde: [
     { id: 'delta', nom: 'Delta 2 Hz', detail: 'Repos profond', ecart: 2 },
@@ -298,7 +310,8 @@ const AIDE = {
 const TITRE = { musique: 'Musique', bruit: 'Bruit', onde: 'Onde' };
 
 // Mix courant : type → { id → volume 0..1 }
-const mix = { musique: { nappe: .5 }, bruit: { pluie: .6 }, onde: { alpha: .4 } };
+const mix = { musique: { nappe: .5 }, bruit: { 'pluie-foret': .6 }, onde: { alpha: .4 } };
+const DOSSIER_SONS = location.hostname.endsWith('github.io') ? 'sons/' : '../sons/';
 
 // --- Audio ---
 let ctx, maitre;
@@ -342,39 +355,9 @@ const GENERATEURS = {
   blanc: d => { const n = bruitDe('blanc'); for (let i = 0; i < d.length; i++) d[i] = n() * .25; },
   rose: d => { const n = bruitDe('rose'); for (let i = 0; i < d.length; i++) d[i] = n() * .3; },
   brun: d => { const n = bruitDe('brun'); for (let i = 0; i < d.length; i++) d[i] = n() * .3; },
-  pluie: (d, R) => { const n = bruitDe('rose'); for (let i = 0; i < d.length; i++) d[i] = n() * .22; },
-  vagues: (d, R) => {
-    const n = bruitDe('brun'), s = bruitDe('rose');
-    for (let i = 0; i < d.length; i++) {
-      const t = i / R, houle = Math.pow(Math.sin(Math.PI * t / 7.5), 2), ressac = Math.pow(Math.sin(Math.PI * (t - 1.2) / 7.5), 8);
-      d[i] = n() * (.12 + .3 * houle) + s() * .12 * ressac;
-    }
-  },
-  vent: (d, R) => { const n = bruitDe('rose'), r = lent(.00002); for (let i = 0; i < d.length; i++) d[i] = n() * (.08 + .3 * r()); },
-  feu: (d, R) => { const n = bruitDe('brun'); for (let i = 0; i < d.length; i++) d[i] = n() * .18; },
-  ruisseau: (d, R) => { const n = bruitDe('blanc'), r = lent(.002); for (let i = 0; i < d.length; i++) d[i] = n() * (.06 + .1 * r()); },
-};
-const FILTRES = {
-  pluie: [['highpass', 500, .7], ['lowpass', 7000, .7]],
-  vagues: [['lowpass', 1400, .7]],
-  vent: [['bandpass', 450, .6]],
-  feu: [['lowpass', 3500, .7]],
-  ruisseau: [['bandpass', 2200, .9]],
 };
 // Couches d'événements ajoutées après la boucle
 const EVENEMENTS = {
-  pluie: (d, R) => {
-    for (let k = 0; k < DUREE_BOUCLE * 60; k++) {
-      const a = Math.pow(Math.random(), 3) * .5, l = R * .012 | 0;
-      ajouterEvenement(d, Math.random() * d.length | 0, l, j => (Math.random() * 2 - 1) * a * Math.exp(-j / (l / 5)));
-    }
-  },
-  feu: (d, R) => {
-    for (let k = 0; k < DUREE_BOUCLE * 9; k++) {
-      const a = Math.pow(Math.random(), 2) * .9, l = R * (.003 + Math.random() * .02) | 0;
-      ajouterEvenement(d, Math.random() * d.length | 0, l, j => (Math.random() * 2 - 1) * a * Math.exp(-j / (l / 4)));
-    }
-  },
   carillons: (d, R) => {
     const gamme = [523.3, 587.3, 659.3, 784, 880, 1046.5, 1174.7];
     for (let t = 0; t < DUREE_BOUCLE; t += 1.6 + Math.random() * 2.4) {
@@ -400,7 +383,24 @@ function buffer(cle) {
   const buf = ctx.createBuffer(1, d.length, ctx.sampleRate); buf.getChannelData(0).set(d);
   return cacheBuffers[cle] = buf;
 }
-function lireBuffer(cle, sortie, filtres = []) {
+// Fichiers ElevenLabs : le MP3 ajoute un court silence au début et à la fin,
+// donc on retire les bords et on fond la fin dans le début pour une boucle sans trou
+const cacheFichiers = {};
+function chargerFichier(id) {
+  return cacheFichiers[id] ??= fetch(DOSSIER_SONS + id + '.mp3')
+    .then(r => r.arrayBuffer()).then(a => ctx.decodeAudioData(a))
+    .then(src => {
+      const R = src.sampleRate, BORD = 2400, F = R / 2 | 0, N = src.length - 2 * BORD - F;
+      const buf = ctx.createBuffer(src.numberOfChannels, N, R);
+      for (let c = 0; c < src.numberOfChannels; c++) {
+        const e = src.getChannelData(c).subarray(BORD, src.length - BORD), d = buf.getChannelData(c);
+        for (let i = 0; i < N; i++) d[i] = e[i];
+        for (let i = 0; i < F; i++) { const t = i / F; d[i] = e[N + i] * Math.sqrt(1 - t) + e[i] * Math.sqrt(t); }
+      }
+      return buf;
+    });
+}
+function lireBuffer(cle, sortie, filtres = []) { // sons générés par le code
   const s = ctx.createBufferSource(); s.buffer = buffer(cle); s.loop = true;
   let n = s;
   filtres.forEach(([type, f, q]) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; n.connect(b); n = b; });
@@ -410,8 +410,13 @@ function lireBuffer(cle, sortie, filtres = []) {
 function creerVoie(type, id) {
   const gain = ctx.createGain(); gain.gain.value = 0; gain.connect(maitre);
   const noeuds = [], def = SONS[type].find(s => s.id === id);
-  if (type === 'bruit') {
-    noeuds.push(lireBuffer(id, gain, FILTRES[id]));
+  if (type === 'bruit' && def.fichier) {
+    chargerFichier(id).then(buf => {
+      if (!voies[type + ':' + id]) return; // retiré pendant le chargement
+      const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(gain); s.start(); noeuds.push(s);
+    });
+  } else if (type === 'bruit') {
+    noeuds.push(lireBuffer(id, gain));
   } else if (type === 'onde') {
     const fusion = ctx.createChannelMerger(2), g2 = ctx.createGain(); g2.gain.value = .3; fusion.connect(g2); g2.connect(gain);
     [200, 200 + def.ecart].forEach((f, c) => { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(fusion, 0, c); o.start(); noeuds.push(o); });
