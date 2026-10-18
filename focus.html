@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1B2A35">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Concentration</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -135,16 +136,16 @@
         <stop offset="0" stop-color="#8FA3B2"/><stop offset=".45" stop-color="#4E6678"/><stop offset="1" stop-color="#1B2A35"/>
       </linearGradient>
       <linearGradient id="voileM" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#DDE2E7" stop-opacity=".35"/><stop offset="1" stop-color="#DDE2E7" stop-opacity="0"/>
+        <stop offset="0" stop-color="#DDE2E7" stop-opacity="0"/><stop offset=".5" stop-color="#DDE2E7" stop-opacity=".3"/><stop offset="1" stop-color="#DDE2E7" stop-opacity="0"/>
       </linearGradient>
-    </defs>
+    <linearGradient id="lac" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B2A35" stop-opacity="0"/><stop offset=".12" stop-color="#1B2A35" stop-opacity=".9"/><stop offset="1" stop-color="#1B2A35"/></linearGradient></defs>
     <rect width="400" height="860" fill="url(#ciel)"/>
     <path d="M0 300 L70 230 L120 260 L190 170 L250 240 L310 200 L400 270 V860 H0Z" fill="#6F8798" opacity=".7"/>
     <rect y="180" width="400" height="160" fill="url(#voileM)"/>
     <path d="M0 360 L50 300 L110 340 L170 280 L240 350 L300 310 L400 370 V860 H0Z" fill="#4A6274"/>
     <rect y="290" width="400" height="120" fill="url(#voileM)" opacity=".7"/>
     <path d="M0 430 L80 380 L150 420 L220 370 L290 430 L360 400 L400 420 V860 H0Z" fill="#2E4556"/>
-    <rect y="440" width="400" height="420" fill="#1B2A35" opacity=".85"/>
+    <rect y="420" width="400" height="440" fill="url(#lac)"/>
   </svg>
   <div id="brume"></div>
 </div>
@@ -159,7 +160,7 @@
         <li><button class="couche" data-type="bruit"><span class="type">Bruit</span><span class="choix"></span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke-width="1.8"><path d="M4 2l4 4-4 4"/></svg></button></li>
         <li><button class="couche" data-type="onde"><span class="type">Onde</span><span class="choix"></span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke-width="1.8"><path d="M4 2l4 4-4 4"/></svg></button></li>
       </ul>
-      <input class="objectif" id="objectif" placeholder="Objectif de la session (facultatif)" enterkeyhint="done">
+      <input class="objectif" id="objectif" placeholder="Objectif (facultatif)" enterkeyhint="done">
     </div>
     <div class="roue-boite"><div class="roue" id="roue" aria-label="Durée en minutes"></div></div>
   </div>
