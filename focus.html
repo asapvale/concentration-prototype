@@ -264,11 +264,15 @@ if (navigator.audioSession) navigator.audioSession.type = 'playback';
 // --- Catalogue (prototype : tout est généré par le code) ---
 const SONS = {
   musique: [
-    { id: 'nappe', nom: 'Nappe grave', detail: 'Accord tenu, très doux', notes: [110, 164.8, 220] },
-    { id: 'aube', nom: 'Aube', detail: 'Accord ouvert, lumineux', notes: [146.8, 220, 293.7] },
-    { id: 'crepuscule', nom: 'Crépuscule', detail: 'Accord mineur, enveloppant', notes: [130.8, 155.6, 196] },
-    { id: 'carillons', nom: 'Carillons', detail: 'Notes cristallines espacées', buffer: 'carillons' },
-    { id: 'piano', nom: 'Piano lointain', detail: 'Notes graves et lentes', buffer: 'piano' },
+    // Kevin MacLeod (incompetech.com), licence CC BY 4.0
+    { id: 'musiques/meditation-impromptu-01', nom: 'Méditation I', detail: 'Kevin MacLeod', fichier: true },
+    { id: 'musiques/meditation-impromptu-02', nom: 'Méditation II', detail: 'Kevin MacLeod', fichier: true },
+    { id: 'musiques/healing', nom: 'Healing', detail: 'Kevin MacLeod', fichier: true },
+    { id: 'musiques/floating-cities', nom: 'Floating Cities', detail: 'Kevin MacLeod', fichier: true },
+    { id: 'musiques/dreamer', nom: 'Dreamer', detail: 'Kevin MacLeod', fichier: true },
+    { id: 'musiques/clean-soul', nom: 'Clean Soul', detail: 'Kevin MacLeod', fichier: true },
+    { id: 'musiques/peaceful-desolation', nom: 'Peaceful Desolation', detail: 'Kevin MacLeod', fichier: true },
+    { id: 'musiques/bathed-in-the-light', nom: 'Bathed in the Light', detail: 'Kevin MacLeod', fichier: true },
   ],
   bruit: [
     { id: 'pluie-foret', nom: 'Pluie en forêt', fichier: true },
@@ -310,7 +314,7 @@ const AIDE = {
 const TITRE = { musique: 'Musique', bruit: 'Bruit', onde: 'Onde' };
 
 // Mix courant : type → { id → volume 0..1 }
-const mix = { musique: { nappe: .5 }, bruit: { 'pluie-foret': .6 }, onde: { alpha: .4 } };
+const mix = { musique: { 'musiques/meditation-impromptu-01': .5 }, bruit: { 'pluie-foret': .6 }, onde: { alpha: .4 } };
 const DOSSIER_SONS = location.hostname.endsWith('github.io') ? 'sons/' : '../sons/';
 
 // --- Audio ---
@@ -335,10 +339,6 @@ function boucle(gen) {
   for (let i = 0; i < F; i++) { const t = i / F; d[i] = brut[N + i] * (1 - t) + brut[i] * t; }
   return d;
 }
-// Événements ponctuels (gouttes, crépitements, notes) : ajoutés en bouclant, donc raccord parfait
-function ajouterEvenement(d, debut, longueur, f) {
-  for (let k = 0; k < longueur; k++) d[(debut + k) % d.length] += f(k);
-}
 function bruitDe(couleur) {
   let b0 = 0, b1 = 0, b2 = 0, dernier = 0;
   return () => {
@@ -348,49 +348,27 @@ function bruitDe(couleur) {
     dernier = (dernier + .02 * w) / 1.02; return dernier * 12;
   };
 }
-// Bruit lissé lentement, pour les variations naturelles (rafales, courant)
-function lent(vitesse) { let v = 0, cible = 0; return () => { if (Math.random() < vitesse) cible = Math.random(); v += (cible - v) * vitesse * 4; return v; }; }
-
 const GENERATEURS = {
   blanc: d => { const n = bruitDe('blanc'); for (let i = 0; i < d.length; i++) d[i] = n() * .25; },
   rose: d => { const n = bruitDe('rose'); for (let i = 0; i < d.length; i++) d[i] = n() * .3; },
   brun: d => { const n = bruitDe('brun'); for (let i = 0; i < d.length; i++) d[i] = n() * .3; },
 };
-// Couches d'événements ajoutées après la boucle
-const EVENEMENTS = {
-  carillons: (d, R) => {
-    const gamme = [523.3, 587.3, 659.3, 784, 880, 1046.5, 1174.7];
-    for (let t = 0; t < DUREE_BOUCLE; t += 1.6 + Math.random() * 2.4) {
-      const f = gamme[Math.random() * gamme.length | 0], a = .12 + Math.random() * .1, l = R * 5;
-      ajouterEvenement(d, t * R | 0, l, j => { const s = j / R; return a * Math.exp(-s * 1.2) * (Math.sin(2 * Math.PI * f * s) + .3 * Math.sin(2 * Math.PI * f * 2.76 * s) * Math.exp(-s * 3)); });
-    }
-  },
-  piano: (d, R) => {
-    const notes = [110, 130.8, 164.8, 196, 220, 261.6];
-    for (let t = 0; t < DUREE_BOUCLE; t += 2.5 + Math.random() * 2.5) {
-      const f = notes[Math.random() * notes.length | 0], a = .2 + Math.random() * .1, l = R * 6;
-      ajouterEvenement(d, t * R | 0, l, j => { const s = j / R, att = Math.min(1, s * 200);
-        return a * att * (Math.exp(-s * .7) * Math.sin(2 * Math.PI * f * s) + .5 * Math.exp(-s * 1.4) * Math.sin(4 * Math.PI * f * s) + .25 * Math.exp(-s * 2.5) * Math.sin(6 * Math.PI * f * s)); });
-    }
-  },
-};
-
 const cacheBuffers = {};
 function buffer(cle) {
   if (cacheBuffers[cle]) return cacheBuffers[cle];
-  const d = boucle(GENERATEURS[cle] || (() => {}));
-  if (EVENEMENTS[cle]) EVENEMENTS[cle](d, ctx.sampleRate);
+  const d = boucle(GENERATEURS[cle]);
   const buf = ctx.createBuffer(1, d.length, ctx.sampleRate); buf.getChannelData(0).set(d);
   return cacheBuffers[cle] = buf;
 }
-// Fichiers ElevenLabs : le MP3 ajoute un court silence au début et à la fin,
-// donc on retire les bords et on fond la fin dans le début pour une boucle sans trou
+// Fichiers MP3 : le format ajoute un court silence au début et à la fin,
+// donc on retire les bords et on fond la fin dans le début pour une boucle sans trou.
+// Fondu de 0,5 s pour les Bruits, 4 s pour les Musiques (raccord moins audible entre deux phrases)
 const cacheFichiers = {};
-function chargerFichier(id) {
+function chargerFichier(id, fondu) {
   return cacheFichiers[id] ??= fetch(DOSSIER_SONS + id + '.mp3')
     .then(r => r.arrayBuffer()).then(a => ctx.decodeAudioData(a))
     .then(src => {
-      const R = src.sampleRate, BORD = 2400, F = R / 2 | 0, N = src.length - 2 * BORD - F;
+      const R = src.sampleRate, BORD = 2400, F = R * fondu | 0, N = src.length - 2 * BORD - F;
       const buf = ctx.createBuffer(src.numberOfChannels, N, R);
       for (let c = 0; c < src.numberOfChannels; c++) {
         const e = src.getChannelData(c).subarray(BORD, src.length - BORD), d = buf.getChannelData(c);
@@ -410,8 +388,8 @@ function lireBuffer(cle, sortie, filtres = []) { // sons générés par le code
 function creerVoie(type, id) {
   const gain = ctx.createGain(); gain.gain.value = 0; gain.connect(maitre);
   const noeuds = [], def = SONS[type].find(s => s.id === id);
-  if (type === 'bruit' && def.fichier) {
-    chargerFichier(id).then(buf => {
+  if (def.fichier) {
+    chargerFichier(id, type === 'musique' ? 4 : .5).then(buf => {
       if (!voies[type + ':' + id]) return; // retiré pendant le chargement
       const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(gain); s.start(); noeuds.push(s);
     });
@@ -420,19 +398,6 @@ function creerVoie(type, id) {
   } else if (type === 'onde') {
     const fusion = ctx.createChannelMerger(2), g2 = ctx.createGain(); g2.gain.value = .3; fusion.connect(g2); g2.connect(gain);
     [200, 200 + def.ecart].forEach((f, c) => { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(fusion, 0, c); o.start(); noeuds.push(o); });
-  } else if (def.buffer) {
-    noeuds.push(lireBuffer(def.buffer, gain, def.buffer === 'piano' ? [['lowpass', 2200, .5]] : []));
-  } else {
-    // Nappe : accord doux qui respire lentement
-    def.notes.forEach((f, i) => {
-      [-4, 4].forEach(desaccord => {
-        const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f; o.detune.value = desaccord;
-        const g = ctx.createGain(); g.gain.value = .05;
-        const lfo = ctx.createOscillator(); lfo.frequency.value = .05 + i * .03;
-        const lg = ctx.createGain(); lg.gain.value = .035; lfo.connect(lg); lg.connect(g.gain);
-        o.connect(g); g.connect(gain); o.start(); lfo.start(); noeuds.push(o, lfo);
-      });
-    });
   }
   return { gain, arreter() { gain.gain.setTargetAtTime(0, ctx.currentTime, .1); setTimeout(() => noeuds.forEach(n => n.stop()), 600); } };
 }
