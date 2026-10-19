@@ -53,6 +53,9 @@
 
   h1 { font-size: 30px; font-weight: 700; letter-spacing: -.025em; margin: 12px 0 0; }
   .sous-titre { color: var(--pierre); margin: 2px 0 0; }
+  .entete { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .ecoute { flex: none; margin-top: 14px; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; }
+  .ecoute svg { fill: var(--brume); }
 
   /* Écran Focus */
   .zone { margin-top: auto; display: grid; grid-template-columns: 1fr 58px; gap: 10px; align-items: stretch; }
@@ -204,8 +207,16 @@
 
 <!-- Focus -->
 <section id="focus" class="vue">
-  <h1>Concentration</h1>
-  <p class="sous-titre">Choisis ton mix, ta durée, et lance.</p>
+  <div class="entete">
+    <div>
+      <h1>Concentration</h1>
+      <p class="sous-titre">Choisis ton mix, ta durée, et lance.</p>
+    </div>
+    <button class="ecoute verre" id="ecoute" aria-label="Écouter le mix">
+      <svg id="ico-ecouter" width="16" height="16" viewBox="0 0 16 16"><path d="M4.5 2.6v10.8a.7.7 0 001 .6l8.8-5.4a.7.7 0 000-1.2L5.5 2a.7.7 0 00-1 .6z"/></svg>
+      <svg id="ico-couper" class="cache" width="16" height="16" viewBox="0 0 16 16"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>
+    </button>
+  </div>
   <div class="zone">
     <div>
       <ul class="couches verre">
@@ -333,9 +344,21 @@ function audio() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     maitre = ctx.createGain(); maitre.connect(ctx.destination);
+    ctx.onstatechange = majEcoute;
   }
   return ctx;
 }
+// Bouton d'écoute : lance ou coupe le Mix hors Session
+function majEcoute() {
+  const joue = ctx && ctx.state === 'running';
+  document.getElementById('ico-ecouter').classList.toggle('cache', joue);
+  document.getElementById('ico-couper').classList.toggle('cache', !joue);
+  document.getElementById('ecoute').setAttribute('aria-label', joue ? 'Couper le mix' : 'Écouter le mix');
+}
+document.getElementById('ecoute').onclick = () => {
+  audio();
+  if (ctx.state === 'running') ctx.suspend(); else { ctx.resume(); synchroniser(); }
+};
 
 const DUREE_BOUCLE = 30;
 // Fond continu : on génère N + F échantillons et on fond la fin dans le début
@@ -519,7 +542,7 @@ function dessinerOptions() {
 }
 function fermerPanneau() {
   panneau.classList.remove('ouvert'); voile.classList.remove('ouvert');
-  if (!enSession && ctx) ctx.suspend();
+  // Le Mix continue de jouer après la fermeture : on le coupe avec le bouton d'écoute
 }
 document.querySelectorAll('.couche').forEach(b => b.onclick = () => ouvrirPanneau(b.dataset.type));
 document.getElementById('p-fermer').onclick = fermerPanneau;
